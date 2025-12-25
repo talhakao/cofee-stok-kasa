@@ -2,19 +2,22 @@ from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
     QLabel, QPushButton, QFrame, QMessageBox, QLineEdit,
     QTableWidget, QTableWidgetItem, QHeaderView,
-    QDialog, QFormLayout, QSpinBox, QDoubleSpinBox
+    QDialog, QFormLayout, QSpinBox, QDoubleSpinBox,
 )
 from PySide6.QtCore import QSize
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QColor
+
 
 import qtawesome as qta
-from api import get_products, add_product
+from api import get_products, add_product, update_product, delete_product
 
 
 APP_QSS = """
 QMainWindow { background: #0b0f1a; }
 QLabel { color: #e6e6e6; }
 
+/* ===== SIDEBAR ===== */
 #Sidebar {
     background: #0f1629;
     border-right: 1px solid #1e2a44;
@@ -31,13 +34,21 @@ QLabel { color: #e6e6e6; }
     color: #d6d6d6;
     background: transparent;
     font-size: 13px;
+    border: 1px solid transparent;
 }
 .SideBtn:hover { background: rgba(59,130,246,0.10); }
 .SideBtn:pressed { background: rgba(59,130,246,0.16); }
 
+QPushButton.SideBtn[active="true"] {
+    background: rgba(59,130,246,0.14);
+    border: 1px solid rgba(59,130,246,0.22);
+}
+
+/* ===== HEADERS ===== */
 #Title { font-size: 22px; font-weight: 900; }
 #Subtle { color:#9aa4b2; font-size:11px; font-weight:700; }
 
+/* ===== CARDS ===== */
 #Card {
     background: rgba(15, 22, 41, 0.85);
     border: 1px solid rgba(30, 42, 68, 0.9);
@@ -46,6 +57,7 @@ QLabel { color: #e6e6e6; }
 #MiniCardTitle { color:#9aa4b2; font-size:11px; font-weight:800; letter-spacing:0.6px; }
 #MiniCardValue { color:#e6e6e6; font-size:20px; font-weight:900; }
 
+/* ===== CHIPS ===== */
 #Chip {
     background: rgba(59,130,246,0.16);
     border: 1px solid rgba(59,130,246,0.35);
@@ -66,6 +78,7 @@ QLabel { color: #e6e6e6; }
 }
 #Divider { background: rgba(30,42,68,0.9); }
 
+/* ===== INPUTS ===== */
 QLineEdit {
     background: rgba(15, 22, 41, 0.85);
     border: 1px solid rgba(30, 42, 68, 0.9);
@@ -76,25 +89,17 @@ QLineEdit {
 }
 QLineEdit:focus { border: 1px solid rgba(59,130,246,0.9); }
 
-.SideBtnActive {
-    background: rgba(59,130,246,0.14);
-    border: 1px solid rgba(59,130,246,0.22);
-}
-
-QPushButton.SideBtn[active="true"] {
-    background: rgba(59,130,246,0.14);
-    border: 1px solid rgba(59,130,246,0.22);
-}
-
+/* ===== BUTTONS ===== */
 #PrimaryBtn {
     background: qlineargradient(x1:0,y1:0,x2:1,y2:1, stop:0 rgba(59,130,246,1), stop:1 rgba(99,102,241,1));
     color: white;
     padding: 10px 14px;
     border-radius: 12px;
     font-weight: 900;
+    border: none;
 }
-#PrimaryBtn:hover { opacity: 0.95; }
-#PrimaryBtn:pressed { opacity: 0.9; }
+#PrimaryBtn:hover { background: rgba(59,130,246,0.92); }
+#PrimaryBtn:pressed { background: rgba(59,130,246,0.82); }
 
 #GhostBtn {
     background: rgba(15, 22, 41, 0.6);
@@ -106,37 +111,47 @@ QPushButton.SideBtn[active="true"] {
 }
 #GhostBtn:hover { background: rgba(59,130,246,0.10); }
 
+/* ===== TABLE (SAFE + PREMIUM) ===== */
 QTableWidget {
     background: transparent;
     border: none;
     color: #e6e6e6;
-    gridline-color: rgba(30,42,68,0.9);
+    gridline-color: rgba(30,42,68,0.35);
     font-size: 13px;
 }
+
 QHeaderView::section {
-    background: transparent;
-    color: #9aa4b2;
+    background: rgba(15, 22, 41, 0.55);
+    color: #cfd8ff;
     border: none;
     padding: 10px;
     font-weight: 900;
 }
-QTableWidget::item { padding: 10px; }
-QTableWidget::item:selected { background: rgba(59,130,246,0.12); }
+
+QTableWidget::item {
+    padding: 10px;
+    color: #e6ebff;
+    border: none;
+}
+
+QTableWidget::item:hover {
+    background: rgba(120,140,255,0.10);
+}
+
+/* ✅ Seçimde yazı görünür: color white */
+QTableWidget::item:selected {
+    background: rgba(59,130,246,0.35);
+    color: #ffffff;
+}
 
 QTableCornerButton::section {
     background: transparent;
     border: none;
 }
 
-QHeaderView::section {
-    background: rgba(15, 22, 41, 0.55);
-    color: #9aa4b2;
-    border: none;
-    padding: 10px;
-    font-weight: 900;
-}
-
+/* ===== DIALOG + SPIN ===== */
 QDialog { background: #0b0f1a; }
+
 QSpinBox, QDoubleSpinBox {
     background: rgba(15, 22, 41, 0.85);
     border: 1px solid rgba(30, 42, 68, 0.9);
@@ -144,8 +159,11 @@ QSpinBox, QDoubleSpinBox {
     padding: 8px 10px;
     color: #e6e6e6;
 }
-QSpinBox:focus, QDoubleSpinBox:focus { border: 1px solid rgba(59,130,246,0.9); }
+QSpinBox:focus, QDoubleSpinBox:focus {
+    border: 1px solid rgba(59,130,246,0.9);
+}
 """
+
 
 
 def make_chip(text: str, danger: bool = False) -> QLabel:
@@ -160,8 +178,9 @@ def set_colored_icon(btn, icon_name: str, color: str, size: int = 18):
 
 
 class AddProductDialog(QDialog):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, initial = None):
         super().__init__(parent)
+        self.initial = initial or {}
         self.setWindowTitle("Yeni Ürün")
         self.setModal(True)
         self.resize(440, 280)
@@ -179,6 +198,8 @@ class AddProductDialog(QDialog):
         title_row.addWidget(title)
         title_row.addStretch(1)
         layout.addLayout(title_row)
+        is_edit = bool(self.initial.get("id"))
+        title.setText("Ürünü Düzenle" if is_edit else "Yeni Ürün Ekle")
 
         form = QFormLayout()
         form.setSpacing(10)
@@ -201,6 +222,12 @@ class AddProductDialog(QDialog):
         form.addRow("Stok", self.stock)
         form.addRow("Fiyat (₺)", self.price)
         layout.addLayout(form)
+
+        if self.initial:
+            self.name.setText(str(self.initial.get("name", "") or ""))
+            self.category.setText(str(self.initial.get("category", "") or ""))
+            self.stock.setValue(int(self.initial.get("stock", 0) or 0))
+            self.price.setValue(float(self.initial.get("price", 0) or 0))
 
         btn_row = QHBoxLayout()
         btn_row.addStretch(1)
@@ -233,6 +260,15 @@ class AddProductDialog(QDialog):
         }
         self.accept()
 
+
+class ClickableTable(QTableWidget):
+    def mousePressEvent(self, event):
+        item = self.itemAt(event.pos())
+        #Boş alana tıklandıysa seçimi kaldırır.
+        if item is None:
+            self.clearSelection()
+            self.setCurrentCell(-1, -1)
+        super().mousePressEvent(event)
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -335,15 +371,15 @@ class MainWindow(QMainWindow):
         stats = QHBoxLayout()
         stats.setSpacing(12)
         self.card_total_products = self.make_stat_card(
-            "TOPLAM ÜRÜN", "0", "fa5s.cubes", "#3b82f6"      # mavi
+            "TOPLAM ÜRÜN", "0", "fa5s.cubes", "#3b82f6"      
         )
 
         self.card_total_stock = self.make_stat_card(
-            "TOPLAM STOK", "0", "fa5s.layer-group", "#22c55e"  # yeşil
+            "TOPLAM STOK", "0", "fa5s.layer-group", "#22c55e"  
         )
 
         self.card_avg_price = self.make_stat_card(
-            "ORT. FİYAT", "₺0.00", "fa5s.tags", "#f59e0b"      # turuncu
+            "ORT. FİYAT", "₺0.00", "fa5s.tags", "#f59e0b"      
         )
         stats.addWidget(self.card_total_products)
         stats.addWidget(self.card_total_stock)
@@ -371,7 +407,7 @@ class MainWindow(QMainWindow):
         head_row.addWidget(self.critical_chip)
         table_layout.addLayout(head_row)
 
-        self.table = QTableWidget(0, 4)
+        self.table = ClickableTable(0, 4)
         self.table.setHorizontalHeaderLabels(["ID", "Ürün", "Kategori", "Stok / Fiyat"])
         self.table.horizontalHeader().setStretchLastSection(True)
         self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
@@ -382,7 +418,10 @@ class MainWindow(QMainWindow):
         self.table.setShowGrid(False)
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
-        self.table.cellClicked.connect(self.on_row_selected)
+        self.table.itemSelectionChanged.connect(self.on_selection_changed)
+        self.table.setFocusPolicy(Qt.NoFocus)
+        self.table.setSelectionMode(QTableWidget.SingleSelection)
+        self.table.setSelectionBehavior(QTableWidget.SelectRows)
         table_layout.addWidget(self.table)
 
         # Detail panel
@@ -423,6 +462,31 @@ class MainWindow(QMainWindow):
         self.detail_hint.setWordWrap(True)
         dlay.addWidget(self.detail_hint)
 
+        # Actions
+        actions = QHBoxLayout()
+        actions.setSpacing(10)
+
+        self.btn_edit = QPushButton(" Düzenle")
+        self.btn_edit.setIcon(qta.icon("fa5s.edit", color="#ffffff"))
+        self.btn_edit.setObjectName("GhostBtn")
+        self.btn_edit.setCursor(Qt.PointingHandCursor)
+        self.btn_edit.clicked.connect(self.edit_selected)
+
+        self.btn_delete = QPushButton(" Sil")
+        self.btn_delete.setIcon(qta.icon("fa5s.trash", color="#ffffff"))
+        self.btn_delete.setObjectName("GhostBtn")
+        self.btn_delete.setCursor(Qt.PointingHandCursor)
+        self.btn_delete.clicked.connect(self.delete_selected)
+
+        actions.addWidget(self.btn_edit)
+        actions.addWidget(self.btn_delete)
+        dlay.addLayout(actions)
+
+        # başlangıçta pasif
+        self.btn_edit.setEnabled(False)
+        self.btn_delete.setEnabled(False)
+
+
         dlay.addStretch(1)
 
         main_row.addWidget(table_card, 1)
@@ -445,6 +509,185 @@ class MainWindow(QMainWindow):
 
         active_btn.setProperty("active", True)
         active_btn.setStyleSheet("")  # refresh
+
+
+    def sync_selected_from_table(self) -> bool:
+        row = self.table.currentRow()
+        if row < 0:
+            return False
+
+        item_id = self.table.item(row, 0)
+        if not item_id:
+            return False
+
+        p = item_id.data(Qt.UserRole)
+        if not p or not isinstance(p, dict) or p.get("id") is None:
+            return False
+
+        self.selected = p
+        if hasattr(self, "btn_edit"):
+            self.btn_edit.setEnabled(True)
+            self.btn_delete.setEnabled(True)
+
+        # detail panel varsa güncelle
+        if hasattr(self, "update_detail_panel"):
+            self.update_detail_panel(p)
+
+        return True
+
+
+    def update_detail_panel(self, p: dict):
+        name = p.get("name") or "-"
+        cat = p.get("category") or "-"
+        stock = int(p.get("stock") or 0)
+        price = float(p.get("price") or 0)
+
+        self.detail_name.setText(name)
+        self.detail_price.setText(f"₺{price:.2f}")
+
+        self.detail_chip_category.setText(f"Kategori: {cat}")
+
+        if stock < 5:
+            self.detail_chip_stock.setObjectName("ChipDanger")
+            self.detail_chip_stock.setText(f"Kritik Stok: {stock}")
+        else:
+            self.detail_chip_stock.setObjectName("Chip")
+            self.detail_chip_stock.setText(f"Stok: {stock}")
+
+        self.detail_chip_stock.style().unpolish(self.detail_chip_stock)
+        self.detail_chip_stock.style().polish(self.detail_chip_stock)
+
+
+
+    def on_selection_changed(self):
+        row = self.table.currentRow()
+        if row < 0:
+            self.selected = None
+            self.btn_edit.setEnabled(False)
+            self.btn_delete.setEnabled(False)
+
+            # boş state
+            self.detail_name.setText("Bir ürün seç")
+            self.detail_price.setText("₺0.00")
+            self.detail_chip_category.setText("Kategori: -")
+            self.detail_chip_stock.setObjectName("Chip")
+            self.detail_chip_stock.setText("Stok: -")
+            self.detail_chip_stock.style().unpolish(self.detail_chip_stock)
+            self.detail_chip_stock.style().polish(self.detail_chip_stock)
+            return
+
+        self.sync_selected_from_table()
+
+        item_id = self.table.item(row, 0)
+        if not item_id:
+            self.selected = None
+            self.btn_edit.setEnabled(False)
+            self.btn_delete.setEnabled(False)
+            return
+
+        p = item_id.data(Qt.UserRole)  # ✅ direkt ürün objesi
+        if not p or not isinstance(p, dict) or p.get("id") is None:
+            self.selected = None
+            self.btn_edit.setEnabled(False)
+            self.btn_delete.setEnabled(False)
+            return
+
+        self.selected = p
+        self.btn_edit.setEnabled(True)
+        self.btn_delete.setEnabled(True)
+
+        # Detay panelini güncelle (varsa)
+        self.update_detail_panel(p)
+
+
+    def edit_selected(self):
+        if not self.selected:
+            self.sync_selected_from_table()
+
+        if not self.selected:
+            QMessageBox.warning(self, "Uyarı", "Önce bir ürün seç.")
+            return
+
+        pid = self.selected.get("id")
+        if pid is None:
+            QMessageBox.critical(self, "Hata", f"Seçili üründe id yok: {self.selected}")
+            return
+
+        dlg = AddProductDialog(self, initial=self.selected)
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return
+
+        if not dlg.result_payload:
+            QMessageBox.warning(self, "Uyarı", "Form verisi alınamadı.")
+            return
+
+        try:
+            self.set_loading(True)
+            update_product(int(pid), dlg.result_payload)
+            self.load_products()
+        except Exception as e:
+            self.set_loading(False)
+            QMessageBox.critical(self, "Hata", f"Ürün güncellenemedi:\n{e}")
+
+        if not self.selected:
+            QMessageBox.warning(self, "Uyarı", "Önce bir ürün seç.")
+            return
+
+        pid = self.selected.get("id")
+        if pid is None:
+            QMessageBox.critical(self, "Hata", f"Seçili ürün id yok!\nselected={self.selected}")
+            return
+
+        dlg = AddProductDialog(self, initial=self.selected)
+        res = dlg.exec()
+
+        if res != 1:
+            return
+
+        payload = dlg.result_payload
+        if not payload:
+            QMessageBox.warning(self, "Uyarı", "Payload boş geldi.")
+            return
+
+        try:
+            self.set_loading(True)
+            update_product(int(pid), payload)
+            self.load_products()
+        except Exception as e:
+            self.set_loading(False)
+            QMessageBox.critical(self, "Hata", f"Update patladı:\n{e}")
+
+
+    def delete_selected(self):
+        if not self.selected:
+            QMessageBox.warning(self, "Uyarı", "Önce bir ürün seç.")
+            return
+
+        pid = self.selected.get("id")
+        if pid is None:
+            QMessageBox.critical(self, "Hata", f"Seçili ürün id yok!\nselected={self.selected}")
+            return
+
+        name = self.selected.get("name", "Ürün")
+        reply = QMessageBox.question(
+            self,
+            "Silme Onayı",
+            f"'{name}' silinsin mi?\nBu işlem geri alınamaz.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+
+        try:
+            self.set_loading(True)
+            delete_product(int(pid))
+            self.selected = None
+            self.load_products()
+        except Exception as e:
+            self.set_loading(False)
+            QMessageBox.critical(self, "Hata", f"Delete patladı:\n{e}")
+
 
     def make_stat_card(self, title: str, value: str, icon_name: str, icon_color: str) -> QFrame:
         c = QFrame()
@@ -524,6 +767,9 @@ class MainWindow(QMainWindow):
         self.card_avg_price      = self.make_stat_card("ORT. FİYAT", "₺0.00", "fa5s.tags", "#f59e0b")     # turuncu
 
         self.table.setRowCount(0)
+        self.selected = None
+        self.btn_edit.setEnabled(False)
+        self.btn_delete.setEnabled(False)
         if not filtered:
             self.table.setRowCount(1)
             self.table.setItem(0, 0, QTableWidgetItem("-"))
@@ -538,18 +784,25 @@ class MainWindow(QMainWindow):
 
         self.table.setRowCount(len(filtered))
         for r, p in enumerate(filtered):
-            self.table.setItem(r, 0, QTableWidgetItem(str(p["id"])))
+            item_id = QTableWidgetItem(str(p["id"]))
+            item_id.setData(Qt.UserRole, p)          # ✅ Ürünü satıra gömdük
+            self.table.setItem(r, 0, item_id)
+
             self.table.setItem(r, 1, QTableWidgetItem(str(p["name"])))
             self.table.setItem(r, 2, QTableWidgetItem(str(p.get("category") or "-")))
 
             stock = int(p.get("stock") or 0)
             price = float(p.get("price") or 0)
-            text = f"Stok: {stock}   |   ₺{price:.2f}"
-            self.table.setItem(r, 3, QTableWidgetItem(text))
+            self.table.setItem(r, 3, QTableWidgetItem(f"Stok: {stock}   |   ₺{price:.2f}"))
+            # kritik stok highlight
+            if stock < 5:
+                for c in range(self.table.columnCount()):
+                    it = self.table.item(r, c)
+                    if it:
+                        it.setBackground(QColor(180, 60, 60, 120))  # soft kırmızı
 
-        # otomatik ilk satırı seç (premium his)
-        self.table.selectRow(0)
-        self.on_row_selected(0, 0)
+
+
 
     def on_row_selected(self, row: int, col: int):
         try:
@@ -566,6 +819,13 @@ class MainWindow(QMainWindow):
             cat = p.get("category") or "-"
             stock = int(p.get("stock") or 0)
             price = float(p.get("price") or 0)
+            self.selected = p
+            self.btn_edit.setEnabled(True)
+            self.btn_delete.setEnabled(True)
+            self.selected = None
+            if hasattr(self, "btn_edit"):
+                self.btn_edit.setEnabled(True)
+                self.btn_delete.setEnabled(True)
 
             self.detail_name.setText(name)
             self.detail_price.setText(f"₺{price:.2f}")
